@@ -149,11 +149,11 @@ ChaptersEnd <- vector("list", length = length(BooksStart))
 # Principio y final de los capítulos
 for (i in 1:length(BooksStart)) {
   s <- which(bookBooks == i)[1]
-  
   ChaptersStart[[i]] <- grep(pattern = "CHAPTER", x = textBooks[bookBooks == i]) + s + 3
   ChaptersEnd[[i]] <- c(ChaptersStart[[i]][2:length(ChaptersStart[[i]])] - 8, BooksEnd[i])
 }
 
+# Creamos tres vectores con la longitud de las líneas del texto,
 book <- numeric(length(HardTimesRaw$text))
 chapter <- numeric(length(HardTimesRaw$text))
 text <- character(length(HardTimesRaw$text))
@@ -164,16 +164,19 @@ for (i in 1:length(BooksStart)) {
   for (j in 1:length(ChaptersStart[[i]])) {
     s <- ChaptersStart[[i]][j]
     e <- ChaptersEnd[[i]][j]
-    
+    # En cada elemento de "book", se indica a qué libro
+    # corresponde cada línea,
     book[m:(e - s + m)] <- i
+    # En cada elemento de "chapter" se indica a qué capítulo
+    # corresponde cada línea,
     chapter[m:(e - s + m)] <- j
+    # Y en "text" van las líneas en sí.
     text[m:(e - s + m)] <- textBooks[s:e]
-    
     m <- m + e - s + 1
   }
 }
 
-# Última línea del libro
+# Obtenemos el índice de la última línea del libro
 e <- which(text == "cold.") 
 HardTimesLines <- data.frame(book = book[1:e], chapter = chapter[1:e], text = text[1:e])
 save(HardTimesLines, file = "data/HardTimesLines.Rdata")
@@ -713,22 +716,34 @@ GEChaptersStart <- grep(pattern = "Chapter", x = GreatExpectationsRaw$text) + 1
 GEChaptersEnd <- integer(length = length(GEChaptersStart))
 for (i in 1:length(GEChaptersStart)) {
   if (i == length(GEChaptersStart)) {
-    GEChaptersEnd[i] <- length(GreatExpectationsRaw)
+    GEChaptersEnd[i] <- length(GreatExpectationsRaw$text)
     next
   }
   GEChaptersEnd[i] <- GEChaptersStart[i + 1] - 2
 }
 
-GEChapterText <- character(length(GreatExpectationsRaw$text))
+GEChapter <- numeric(length(GreatExpectationsRaw$text))
+GEText <- character(length(GreatExpectationsRaw$text))
 
+m <- 1
 # Dividimos en capítulos
 for (i in 1:length(GEChaptersStart)) {
-  
+  s <- GEChaptersStart[i]
+  e <- GEChaptersEnd[i]
+  # En cada elemento de "GEChapter" se indica a qué capítulo
+  # corresponde cada línea,
+  GEChapter[m:(e - s + m)] <- i
+  # Y en "GEText" van las líneas en sí.
+  GEText[m:(e - s + m)] <- GreatExpectationsRaw$text[s:e]
+  m <- m + e - s + 1
 }
 
 # Última palabra del libro
-GELastWord <- which(text == "her.")
-GreatExpectationsLines <- data.frame(chapter = chapter[1:GELastWord], text = text[1:GELastWord])
+GELastWordIndex <- which(GEText == "from her.")
+# Juntamos la información del capítulo al que pertenece cada línea y las líneas
+# en sí en un data frame,
+GreatExpectationsLines <- data.frame(chapter = GEChapter[1:GELastWordIndex], text = GEText[1:GELastWordIndex])
+# Y guardamos el libro dividido según líneas y capítulos en un fichero,
 save(GreatExpectationsLines, file = "data/GreatExpectationsLines.Rdata")
 ```
 
@@ -737,27 +752,31 @@ De nuevo, dividimos el libro en palabras, o lo que es lo mismo, "tokenizar" las 
 leídas según los espacios (" ") que se encuentren.
 
 ```{r}
-WordsRaw <- vector("list", length = nrow(GreatExpectationsLines))
-Words <- vector("list", length = nrow(GreatExpectationsLines))
+GEWordsRaw <- vector("list", length = nrow(GreatExpectationsLines))
+GEWords <- vector("list", length = nrow(GreatExpectationsLines))
 
-book <- numeric(10*nrow(GreatExpectationsLines))
+# Creamos tres vectores con espacio de sobra para almacenar
+# datos sobre cada palabra, no necesitamos saber exactamente
+# cuántas hay, al no importar tanto el uso de memoria.
 chapter <- numeric(10*nrow(GreatExpectationsLines))
 line <- numeric(10*nrow(GreatExpectationsLines))
 word <- character(10*nrow(GreatExpectationsLines))
 
 n <- 0
 for (i in 1:nrow(GreatExpectationsLines)) {
-  WordsRaw[[i]] <- strsplit(x = GreatExpectationsLines$text[i], split = "[ .,;—)(?!‘:]")
-  Words[[i]] <- WordsRaw[[i]][[1]][!WordsRaw[[i]][[1]] == ""]
-  if (length(Words[[i]]) == 0) {
+  # En cada elemento de GEWordsRaw, partimos las líneas de acuerdo con estos
+  # caracteres especificados en "split",
+  GEWordsRaw[[i]] <- strsplit(x = GreatExpectationsLines$text[i], split = "[ .,;—)(?!‘:]")
+  # Y en GEWords almacenamos GEWordsRaw sin los elementos que no contengan palabras,
+  GEWords[[i]] <- GEWordsRaw[[i]][[1]][!GEWordsRaw[[i]][[1]] == ""]
+  if (length(GEWords[[i]]) == 0) {
     next
   }
-  l <- length(Words[[i]])
+  l <- length(GEWords[[i]])
   n <- n + l
-  book[(n - l + 1):n] <- GreatExpectationsLines$book[i]
   chapter[(n - l + 1):n] <- GreatExpectationsLines$chapter[i]
   line[(n - l + 1):n] <- i
-  word[(n - l + 1):n] <- Words[[i]]
+  word[(n - l + 1):n] <- GEWords[[i]]
 }
 
 word <- tolower(word)
@@ -773,7 +792,6 @@ Veamos las 25 palabras más frecuentes en "Grandes Esperanzas".
 ```{r}
 GEWords <- count(GreatExpectationsWords, word, sort = TRUE) %>%
   anti_join(get_stopwords())
-
 head(GEWords, 25)
 ```
 
@@ -823,13 +841,11 @@ GEWordsNegative <- semi_join(x = GEWords, y = negative)
 head(GEWordsNegative, 25)
 ```
 
-Para visualizar esta información recurrimos una vez más a un histograma, pero con una diferencia con
-respecto al anterior, ahora tenemos las palabras clasificadas en dos grupos. Como estamos
-interesados en un análisis de sentimiento escogeremos las palabras que aparezcan más veces que
-cierto umbral, el mismo para las positivas y las negativas. Así podremos ver si hay más palabras de
-un tipo u otro. Para evaluar el sentimiento, consideramos este simplemente como las veces que
-aparece cada palabra, y si esta palabra es negativa le cambiaremos el signo. Representamos a
-continuación este histograma.
+Como antes, primero visualizamos el contaje de la ocurrencia de cada palabra mediante un histograma
+dispuesto verticalmente, con columnas apuntando en direcciones opuestas y con colores escogidos
+adecuadamente de forma que no sólo enseñen a primera vista que tipo de dato categórico representan,
+sino que tenemos el valor añadido de que el azul y el naranja son colores contrarios en la rueda de
+los colores, facilitando así aún más la legibilidad de esta gráfica.
 
 ```{r}
 GEWordsSentiment <- full_join(x = GEWords, y = sentiments)
@@ -846,10 +862,12 @@ GEWordsSentiment %>% filter(n > 20) %>%
   labs(y = "Contribución al sentimiento")
 ```
 
-(Comentar si es positivo o negativo)
+En contraste a "Tiempos Difíciles", el sentimiento de este libro parece estar equilibrado entre
+positivo y negativo, aunque teniendo en cuenta el lenguaje de la época, como antes, es bastante
+posible que este libro sea incluso más negativo que el anterior.
 
 Como antes, podemos representar la anterior información mediante una nube de palabras
-de una forma idéntica,
+de una forma idéntica, aplicando las mismas palabras.
 
 ```{r}
 GreatExpectationsWords %>%
@@ -860,17 +878,13 @@ GreatExpectationsWords %>%
                    max.words = 100, scale = c(3, 0.5))
 ```
 
-A simple vista vemos que dominan las palabras positivas, y cuales son las más frecuentes. Pero si
-tratamos por ejemplo de ver cuéles son las palabras negativas que más aparecen tendremos serias
-dificultades. Aquí vemos claramente porqué el histograma es una representación mucho más completa,
-útil, y fácilmente interpretable.
+Se puede ver, de nuevo, que hay un ligero desbarajuste entre palabras negativas y positivas.
 
 ### Evolución sentimiento
-Tal y como hemos definido el sentimiento (frecuencia de aparición de las palabras, negativo si la
-palabra es negativa) podemos calcularlo a intervalos a lo largo del libro y estudiar su evolución.
+De nuevo, calcularemos la evolución de la frecuencia de los dos sentimientos a lo largo
+de dos divisiones del texto; según capítulos y cada 100 palabras.
 
 #### Por capítulos
-Estudiaremos la evolución del sentimiento a lo largo del libro según capítulos y cada 100 palabras,
 
 ```{r}
 ChaptersSentiment <- list(length(BooksStart))
