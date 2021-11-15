@@ -60,6 +60,9 @@ Para ejemplificar esta serie de visualizaciones introducidas estudiaremos dos li
 del mismo autor, Charles Dickens. Estos son "Tiempos Difíciles" y "Grandes Esperanzas". Ambos podemos
 importarlos descargándolos directamente desde R con la librería `gutenbergr`, en inglés.
 
+El código usado para realizar esta memoria se encuentra en
+[este repositorio de GitHub.](https://github.com/galcerte/AnalisisTextosVisual)
+
 Para adquirir y analizar estos dos libros, haremos uso de los siguientes paquetes, además de
 la siguiente lógica para comprobar que los tenemos instalados.
 
@@ -84,6 +87,7 @@ packages = c(# Programación literaria; R Markdowns
              "wordcloud",
              "reshape2",
              "quanteda",
+             "igraph",
              "lexicon")
 
 # Esta función se usa para comprobar si cada paquete está en la máquina local
@@ -118,8 +122,9 @@ forma podremos luego realizar un análisis por libros o capítulos.
 # Buscamos en https://www.gutenberg.org/ el "EBook-No." del libro (786)
 HardTimesRaw <- gutenberg_download(786)
 
-# Principio y final de los libros
+# Encontramos el número de cada línea donde comienza un libro
 BooksStart <- grep(pattern = "BOOK THE", x = HardTimesRaw$text) + 4
+# y ahora donde termina,
 BooksEnd <- grep(pattern = "(END OF THE|FOOTNOTES)", x = HardTimesRaw$text) - 4
 
 # Eliminamos el contenido de las apariciones en el índice
@@ -174,15 +179,15 @@ HardTimesLines <- data.frame(book = book[1:e], chapter = chapter[1:e], text = te
 save(HardTimesLines, file = "data/HardTimesLines.Rdata")
 ```
 
-### División palabras
+### División por palabras
 Es necesario también dividir el texto por palabras, si queremos contar las veces que aparece cada
 una, por ejemplo. Al llevar a cabo este proceso hemos de asegurarnos de eliminar correctamente los
-signos de puntuación. También hemos de recordar el uso muy común en ingles del apóstrofe "’". Este
-caracter será mejor no eliminarlo, para conservar como una palabras por ejemplo "don’t".
+signos de puntuación. También hemos de recordar el uso muy común en inglés del apóstrofe "’".
+Será mejor no eliminar este caracter, para conservar palabras como por ejemplo "don’t".
 
 Otro detalle importante a tener en cuenta es que para contar las veces que aparece cada palabra no
 nos interesa distinguir entre si aparece con la primera letra en mayúscula o no. Con lo cual
-utilizaremos el comando `tolower` para pasar todas las letras de las palabras a minúsculas.
+utilizaremos la función `tolower()` para pasar todas las letras de las palabras a minúsculas.
 
 ```{r}
 WordsRaw <- vector("list", length = nrow(HardTimesLines))
@@ -240,7 +245,7 @@ WORDS %>% filter(n > 180) %>% mutate(word = reorder(word, n)) %>%
   ggplot(aes(word, n)) + geom_col() + coord_flip() + labs(title = "Palabras más comunes en Tiempos Difíciles")
 ```
 
-Esta información también la podemos representar mediante una nube de palabras. Estas son
+También podemos representar esta información mediante una nube de palabras. Estas son
 representaciones gráficas en las que se disponen de forma arbitraria las palabras con un tamaño
 variable en función de lo frecuentes que son en el texto. Como ya dijimos, son más bien una
 representación artística, a nosotros como científicos de datos nos aporta mucha más información y
@@ -251,7 +256,7 @@ mas adecuada un histograma. Aun así, merece la pena contruir una para ver cómo
 HardTimesWords %>%
   anti_join(stop_words) %>%
   count(word) %>%
-  {wordcloud(.$word, .$n, max.words = 100, scale = c(3,.5))}
+  {wordcloud(.$word, .$n, max.words = 100, scale = c(3, 0.5))}
 ```
 
 Además de estudiar la frecuencia de aparición de las palabras, podemos hacer lo mismo con grupos de
@@ -269,7 +274,7 @@ HardTimesBooksBigrams <- HardTimesLines %>%
   filter(bigram != "NA NA") %>%
   count(book, bigram, sort = TRUE)
 
-HardTimesBooksBigrams %>% filter(book == 1) %>% mutate(bigram = reorder(bigram, n)) %>% slice(1:19) %>% ggplot(aes(x = n, y = bigram)) + geom_col() +   labs(title = "book 1")
+HardTimesBooksBigrams %>% filter(book == 1) %>% mutate(bigram = reorder(bigram, n)) %>% slice(1:19) %>% ggplot(aes(x = n, y = bigram)) + geom_col() + labs(title = "Primer libro")
 ```
 
 La primera parte podría considerarse una presentación de los diversos personajes que irán
@@ -281,7 +286,7 @@ realista y práctica, dejando de lado toda imaginación o fantasía) contrasta c
 circo que llega a la ciudad.
 
 ```{r}
-HardTimesBooksBigrams %>% filter(book == 2) %>% mutate(bigram = reorder(bigram, n)) %>% slice(1:19) %>% ggplot(aes(x = n, y = bigram)) + geom_col() +   labs(title = "book 2")
+HardTimesBooksBigrams %>% filter(book == 2) %>% mutate(bigram = reorder(bigram, n)) %>% slice(1:19) %>% ggplot(aes(x = n, y = bigram)) + geom_col() + labs(title = "Segundo libro")
 ```
 
 En la segunda parte del libro los niños ya se han hecho mayores. Tom empieza a trabajar y su hermana
@@ -298,7 +303,7 @@ estos diálogos contrastan con la forma de ser y la historia del obrero que nos 
 representando todo lo contrario.
 
 ```{r}
-HardTimesBooksBigrams %>% filter(book == 3) %>% mutate(bigram = reorder(bigram, n)) %>% slice(1:19) %>% ggplot(aes(x = n, y = bigram)) + geom_col() + labs(title = "book 3")
+HardTimesBooksBigrams %>% filter(book == 3) %>% mutate(bigram = reorder(bigram, n)) %>% slice(1:19) %>% ggplot(aes(x = n, y = bigram)) + geom_col() + labs(title = "Tercer libro")
 ```
 
 Las deudas que acumula Tom por su mal hábito de apostar a juegos de azar acaban llevándole a trazar
@@ -357,7 +362,7 @@ WORDSsentiment %>% filter(n > 20) %>%
   ggplot(aes(word, n, fill = sentiment)) +
   geom_col() +
   coord_flip() +
-  labs(y = "Contribution to sentiment")
+  labs(y = "Contribución al sentimiento")
 ```
 
 Como vemos en el gráfico, predominan claramente las palabras con connotación positiva. Esto nos
@@ -473,8 +478,7 @@ Sentiment[[l]] <- Sentiment[[l]]$n[Sentiment[[l]]$sentiment == "positive"] - Sen
 
 Group10LinesSentiment <- data.frame(Group100Words = seq(length(Group100Words) + 1), sentiment = unlist(Sentiment))
 
-ggplot(Group10LinesSentiment, aes(x = Group100Words, y = sentiment))
-+ geom_bar(stat = "identity")
+ggplot(Group10LinesSentiment, aes(x = Group100Words, y = sentiment)) + geom_bar(stat = "identity")
 ```
 
 Podría sorprendernos la cantidad escasa de puntos del histograma, pero recordemos, no todas las
@@ -555,7 +559,7 @@ logsig <- logsig[order(logsig, decreasing=T)]
 ```{r}
 # Ponemos todos los estadísticos de significancia en un solo data frame
 resultOverView <- data.frame(
-  names(sort(kij, decreasing=T)[1:10]), sort(kij, decreasing=T)[1:10],
+  names(sort(kij, decreasing = T)[1:10]), sort(kij, decreasing = T)[1:10],
   names(mutualInformationSig[1:10]), mutualInformationSig[1:10], 
   names(dicesig[1:10]), dicesig[1:10], 
   names(logsig[1:10]), logsig[1:10],
@@ -597,12 +601,12 @@ tmpGraph[, 3] <- coocs[1:numberOfCoocs]
 # Unimos los triples a resultGraph
 resultGraph <- rbind(resultGraph, tmpGraph)
 
-# Iteration over the most significant numberOfCoocs co-occurrences of the search term
 # Iteramos sobre los elementos de numberOfCoocs más significativos
 for (i in 1:numberOfCoocs) {
-  # Calling up the co-occurrence calculation for term i from the search words co-occurrences
+  # Hacemos el cálculo de co-ocurrencia para el término i-ésimo de las co-ocurrencias
+  # de los términos de búsqueda
   newCoocTerm <- names(coocs)[i]
-  coocs2 <- calculateCoocStatistics(newCoocTerm, binDTM, measure="LOGLIK")
+  coocs2 <- calculateCoocStatistics(newCoocTerm, binDTM, measure = "LOGLIK")
   
   # Imprimimos las co-ocurrencias
   coocs2[1:10]
@@ -670,6 +674,13 @@ plot(graphNetwork,
 ```
 
 # Grandes Esperanzas
+Esta novela narra la historia de Phillip Pirrip, un huérfano aprendiz de herrero cuya aspiración
+pasará a ser convertirse en un noble caballero, describiendo su vida desde su niñez hasta su
+madurez. Considerada una novela de aprendizaje, la historia puede también ser considerada como una
+semiautobiografía de Dickens, al igual que muchas de sus obras, en la cual mezcla sus experiencias
+de vida con su entorno social. La trama de la historia toma desde la víspera de Navidad de 1812,
+cuando el protagonista tiene solo siete años de edad, hasta el invierno de 1840. [4]
+
 ## Organización de los datos
 ### Clasificación de las líneas por capítulos
 Veamos qué nos depara este libro. Está dividido en 59 capítulos, sin estar dividido por libros.
@@ -681,20 +692,47 @@ para poder clasificar las líneas por capítulos adecuadamente.
 # Descargamos Great Expectations de la biblioteca Gutenberg,
 GreatExpectationsRaw <- gutenberg_download(1400)
 
+# Nos deshacemos de la columna llamada "gutenberg_id", ya que no nos sirve para nada,
+GreatExpectationsRaw <- subset(GreatExpectationsRaw, select = -gutenberg_id)
+
 # Quitamos las primeras líneas del texto, dado que contienen una lista
 # de capítulos, que no nos ayudan para dividir el texto en capítulos
-GreatExpectationsRaw$text <- GreatExpectationsRaw$text[-c(1:(14+59+6))]
+GreatExpectationsRaw <- GreatExpectationsRaw[-c(1:(14 + 59 + 6)),]
 
-GEChaptersStart <- vector("list", length = length(GEBooksStart))
-GEChaptersEnd <- vector("list", length = length(GEBooksStart))
+# Así es como haremos para saber cuándo comienza cada capítulo;
+# Afortunadamente, la palabra "Chapter" no aparece en la novela
+# en sí, únicamente se usa para separar los capítulos.
+# Entonces, podemos usar grep() para saber en qué líneas
+# comienzan los capítulos.
+# Sumamos un 1 dado que no queremos incluir a la línea que contiene "Chapter"
+# en nuestra clasificación.
+GEChaptersStart <- grep(pattern = "Chapter", x = GreatExpectationsRaw$text) + 1
 
-# Última palabra del libros
-e <- which(text == "her.")
-GreatExpectationsLines <- data.frame(book = book[1:e], chapter = chapter[1:e], text = text[1:e])
+# Los capítulos acaban cuando comienza otro, así que usaremos
+# el vector anterior para saber esto,
+GEChaptersEnd <- integer(length = length(GEChaptersStart))
+for (i in 1:length(GEChaptersStart)) {
+  if (i == length(GEChaptersStart)) {
+    GEChaptersEnd[i] <- length(GreatExpectationsRaw)
+    next
+  }
+  GEChaptersEnd[i] <- GEChaptersStart[i + 1] - 2
+}
+
+GEChapterText <- character(length(GreatExpectationsRaw$text))
+
+# Dividimos en capítulos
+for (i in 1:length(GEChaptersStart)) {
+  
+}
+
+# Última palabra del libro
+GELastWord <- which(text == "her.")
+GreatExpectationsLines <- data.frame(chapter = chapter[1:GELastWord], text = text[1:GELastWord])
 save(GreatExpectationsLines, file = "data/GreatExpectationsLines.Rdata")
 ```
 
-### División palabras
+### División por palabras
 De nuevo, dividimos el libro en palabras, o lo que es lo mismo, "tokenizar" las líneas
 leídas según los espacios (" ") que se encuentren.
 
@@ -772,17 +810,17 @@ GreatExpectationsBigrams %>% mutate(bigram = reorder(bigram, n)) %>% slice(1:19)
 Veamos las 25 palabras positivas y negativas que más aparecen en el libro.
 
 ```{r}
-# Diccionario positive/negative
+# Seleccionamos el diccionario de palabras a usar
 sentiments <- get_sentiments("bing")
 ```
 
 ```{r}
 positive <- filter(.data = sentiments, sentiment == "positive")
-GEWordspositive <- semi_join(x = GEWords, y = positive)
-head(GEWordspositive, 25)
+GEWordsPositive <- semi_join(x = GEWords, y = positive)
+head(GEWordsPositive, 25)
 negative <- filter(.data = sentiments, sentiment == "negative")
-GEWordsnegative <- semi_join(x = GEWords, y = negative)
-head(GEWordsnegative, 25)
+GEWordsNegative <- semi_join(x = GEWords, y = negative)
+head(GEWordsNegative, 25)
 ```
 
 Para visualizar esta información recurrimos una vez más a un histograma, pero con una diferencia con
@@ -805,17 +843,13 @@ GEWordsSentiment %>% filter(n > 20) %>%
   ggplot(aes(word, n, fill = sentiment)) +
   geom_col() +
   coord_flip() +
-  labs(y = "Contribution to sentiment")
+  labs(y = "Contribución al sentimiento")
 ```
 
-Como vemos en el gráfico, predominan claramente las palabras con connotación positiva. Esto nos
-podría llevar a pensar que el libro cuenta una historia feliz. Y nada más lejos de la realidad, en
-este caso es justo al contrario. Este resultado es consecuencia de la forma de hablar de la época
-(educada, elegante y por decirlo de alguna forma, con mucha ponposidad) exagerada hasta el extremo
-sobre todo en ciertos personajes.
+(Comentar si es positivo o negativo)
 
-La información expuesta anteriormente podemos representarla también con una nube de palabras, en que
-se distinga entre palabras positivas y negativas por color (y localización).
+Como antes, podemos representar la anterior información mediante una nube de palabras
+de una forma idéntica,
 
 ```{r}
 GreatExpectationsWords %>%
@@ -832,42 +866,16 @@ dificultades. Aquí vemos claramente porqué el histograma es una representació
 útil, y fácilmente interpretable.
 
 ### Evolución sentimiento
-#### Por libros
 Tal y como hemos definido el sentimiento (frecuencia de aparición de las palabras, negativo si la
 palabra es negativa) podemos calcularlo a intervalos a lo largo del libro y estudiar su evolución.
-Este es un ejercicio muy recurrente en las fuentes bibliográficas [1] y [2]. Para empezar, veamos el
-sentimiento de cada capítulo del libro con un histograma.
-
-```{r}
-GreatExpectationsSentiment <- inner_join(x = GreatExpectationsWords, y = sentiments)
-
-GEChapterSentiment <- count(x = GreatExpectationsSentiment, book, sentiment)
-
-p <- filter(.data = BooksSentiment, sentiment == "negative")
-n <- filter(.data = BooksSentiment, sentiment == "positive")
-BooksSentiment <- data.frame(book = p$book, sentiment = (p$n - n$n)/(p$n + n$n))
-
-ggplot(BooksSentiment, aes(x = book, y = sentiment)) + geom_bar(stat = "identity", show.legend = FALSE)
-```
-
-Si recordamos el pequeño resumen del libro expuesto anteriormente, es difícil interpretar este
-resultado. Teniendo en cuenta el contenido del libro, cabría esperar que el sentimiento a lo largo
-de las partes del libro tuviera una tendencia negativa, ya que poco a poco nos vamos acercando al
-triste final, y las tragedias y consecuencias negativas de todo lo anterior van apareciendo. Aunque
-sí es cierto que no todo hacia el final es malo, vemos que algunos personajes se dan cuenta de sus
-errores (aunque ya sea tarde) e intentan cambiar, sí es cierto que no sabemos interpretar el
-histograma anterior. Esto es debido a la capacidad limitada de estas técticas de análisis,
-recordemos que solo hemos visto si las palabras individualmente tienen una connotación positiva o
-negativa. Esto no es suficiente para un libro de literatura con un lenguaje complejo, harían falta
-técticas más complicadas que están fuera del alcance y los objetivos de este trabajo.
 
 #### Por capítulos
-Veamos ahora la evolución del sentimiento a lo largo de los capítulos.
+Estudiaremos la evolución del sentimiento a lo largo del libro según capítulos y cada 100 palabras,
 
 ```{r}
 ChaptersSentiment <- list(length(BooksStart))
 for (i in 1:length(BooksStart)) {
-  ChaptersSentiment[[i]] <- count(x = GreatExpectationssentiment[GreatExpectationssentiment$book == i, ], chapter, sentiment)
+  ChaptersSentiment[[i]] <- count(x = GreatExpectationsSentiment[GreatExpectationsSentiment$book == i, ], chapter, sentiment)
 }
 
 for (i in 1:length(BooksStart)) {
@@ -886,28 +894,20 @@ historia contada en el libro haría falta profundizar mucho más en la historia,
 este nivel de detalle. Como tendencia más o mejor general podemos decir que el sentimiento va
 oscilando a lo largo de la novela.
 
-Fijémonos en los últimos capítulos. Al final del libro, como ya hemos comentado, se rompen las vidas
-de los personajes y se hacen palpables las consecuencias de su vida anterior y su educación. Esto
-podemos verlo en el antepenúltimo y en el penúltimo capítulo. En el último capítulo, como ya muchas
-historias nos tienen acostumbrados, a pesar de todas las desgracias anteriores, se cuenta la vida
-posterior a la historia de los personajes principales. Aunque muchos detalles sean tristes y
-trágicos, la tendencia general es positiva. Estos detalles vemos que el análisis de sentimiento los
-ha detectado más o menos bien.
-
 #### Por cada 100 palabras
 También podemos ver la evolución del sentimiento a lo largo del texto por intervalos más regulares.
 Veamos la evolución del sentimiento por cada 100 palabras.
 
 ```{r}
-Sentiment <- list(nrow(GreatExpectationssentiment)%%100 + 2)
+Sentiment <- list(nrow(GreatExpectationsSentiment) %% 100 + 2)
 
-Group100Words <- seq(from = 101, to = nrow(GreatExpectationssentiment), by = 100)
+Group100Words <- seq(from = 101, to = nrow(GreatExpectationsSentiment), by = 100)
 
 for (i in Group100Words) {
-  Sentiment[[(i - 1)/100]] <- slice(GreatExpectationssentiment, (i - 100):(i - 1))
+  Sentiment[[(i - 1)/100]] <- slice(GreatExpectationsSentiment, (i - 100):(i - 1))
 }
 
-Sentiment[[(i - 1)/100 + 1]] <- slice(GreatExpectationssentiment, i:nrow(GreatExpectationssentiment))
+Sentiment[[(i - 1)/100 + 1]] <- slice(GreatExpectationsSentiment, i:nrow(GreatExpectationsSentiment))
 
 for (i in 1:length(Group100Words)) {
   Sentiment[[i]] <- count(x = Sentiment[[i]], sentiment)
@@ -920,34 +920,18 @@ Sentiment[[l]] <- Sentiment[[l]]$n[Sentiment[[l]]$sentiment == "positive"] - Sen
 
 Group10LinesSentiment <- data.frame(Group100Words = seq(length(Group100Words) + 1), sentiment = unlist(Sentiment))
 
-ggplot(Group10LinesSentiment, aes(x = Group100Words, y = sentiment))
-+ geom_bar(stat = "identity")
+ggplot(Group10LinesSentiment, aes(x = Group100Words, y = sentiment)) + geom_bar(stat = "identity")
 ```
-
-Podría sorprendernos la cantidad escasa de puntos del histograma, pero recordemos, no todas las
-palabras tienen connotación positiva o negativa, estamos viendo un subconjunto de las palabras del
-libro. Tal y cómo pasaba en la evolución por capítulos la tendencia general en el sentimiento son
-oscilaciones de amplitud variable. Como ahora hemos tomado más intervalos, las variaciones son más
-abruptas. En estos picos significativos predominan las palabras positivas o negativas, sí, pero para
-ver si realmente esto se corresponde con el significado del texto tendríamos que volver a leer estas
-partes de la novela.
-
-Lo lógico sería que cuanto menor sea el intervalo a lo largo del que calculamos el sentimiento,
-menos se corresponda con el significado del texto. Pero como vimos al promediar por libros, tampoco
-podemos hacer el intervalo demasiado grande, ya que estaríamos juntando partes negativas y
-positivas. Habría que buscar el equilibrio para dar con un intervalo que reproduzca de mejor forma
-la connotación del texto a partir de un análisis por palabras individuales únicamente.
 
 ## Co-occurrence maps
 
 ```{r}
 GreatExpectationsCorpus <- corpus(paste0(list(GreatExpectationsLines$text)))
-
 corpus_sentences <- corpus_reshape(x = GreatExpectationsCorpus, to = "sentences")
-
-data(hash_lemmas) # lemma dictionary
-
-data(sw_jockers) # stop words
+# Diccionario de lemas
+data(hash_lemmas)
+# Palabras de parada
+data(sw_jockers)
 
 # Preprocessing of the corpus of sentences
 corpus_tokens <- corpus_sentences %>% 
@@ -960,7 +944,8 @@ corpus_tokens <- corpus_sentences %>%
 ```{r}
 minimumFrequency <- 10
 
-# Create DTM, prune vocabulary and set binary values for presence/absence of types
+# Creación del DTM, recortado del vocabulario y fijado de valores binarios para la
+# presencia o absencia de tipos
 binDTM <- corpus_tokens %>% 
   tokens_remove("") %>%
   dfm() %>% 
@@ -969,7 +954,7 @@ binDTM <- corpus_tokens %>%
 ```
 
 ```{r}
-# Matrix multiplication for cooccurrence counts
+# Multiplicación de matrices para contaje de co-ocurrencias
 coocCounts <- t(binDTM) %*% binDTM
 ```
 
@@ -1002,7 +987,7 @@ logsig <- logsig[order(logsig, decreasing=T)]
 ```{r}
 # Ponemos todos los estadísticos de significancia en un solo data frame
 resultOverView <- data.frame(
-  names(sort(kij, decreasing=T)[1:10]), sort(kij, decreasing=T)[1:10],
+  names(sort(kij, decreasing = T)[1:10]), sort(kij, decreasing = T)[1:10],
   names(mutualInformationSig[1:10]), mutualInformationSig[1:10], 
   names(dicesig[1:10]), dicesig[1:10], 
   names(logsig[1:10]), logsig[1:10],
@@ -1021,8 +1006,8 @@ coocTerm <- "bounderby"
 ```
 
 ```{r}
-coocs <- calculateCoocStatistics(coocTerm, binDTM, measure="LOGLIK")
-# Display the numberOfCoocs main terms
+coocs <- calculateCoocStatistics(coocTerm, binDTM, measure = "LOGLIK")
+# Enseñamos los términos principales de numberofCoocs
 print(coocs[1:numberOfCoocs])
 ```
 
@@ -1044,28 +1029,28 @@ tmpGraph[, 3] <- coocs[1:numberOfCoocs]
 # Unimos los triples a resultGraph
 resultGraph <- rbind(resultGraph, tmpGraph)
 
-# Iteration over the most significant numberOfCoocs co-occurrences of the search term
+# Iteramos sobre los elementos de numberOfCoocs más significativos
 for (i in 1:numberOfCoocs){
-  
-  # Calling up the co-occurrence calculation for term i from the search words co-occurrences
+  # Hacemos el cálculo de co-ocurrencia para el término i-ésimo de las co-ocurrencias
+  # de los términos de búsqueda
   newCoocTerm <- names(coocs)[i]
-  coocs2 <- calculateCoocStatistics(newCoocTerm, binDTM, measure="LOGLIK")
+  coocs2 <- calculateCoocStatistics(newCoocTerm, binDTM, measure = "LOGLIK")
   
   # Imprimimos las co-ocurrencias
   coocs2[1:10]
   
-  # Structure of the temporary graph object
+  # Estructura del objeto del gráfico temporal
   tmpGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
   tmpGraph[1:numberOfCoocs, 3] <- coocs2[1:numberOfCoocs]
   tmpGraph[, 1] <- newCoocTerm
   tmpGraph[, 2] <- names(coocs2)[1:numberOfCoocs]
   tmpGraph[, 3] <- coocs2[1:numberOfCoocs]
   
-  # Append the result to the result graph
+  # Unimos el resultado al gráfico resultante
   resultGraph <- rbind(resultGraph, tmpGraph[2:length(tmpGraph[, 1]), ])
 }
 
-# Sample of some examples from resultGraph
+# Muestreo de algunos ejemplos de resultGraph
 resultGraph[sample(nrow(resultGraph), 6), ]
 ```
 
@@ -1120,3 +1105,4 @@ plot(graphNetwork,
 [1] https://cran.r-project.org/web/packages/tidytext/vignettes/tidytext.html
 [2] https://datavizm20.classes.andrewheiss.com/example/13-example/
 [3] https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html
+[4] https://es.wikipedia.org/wiki/Grandes_esperanzas
