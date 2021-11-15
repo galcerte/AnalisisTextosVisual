@@ -7,7 +7,7 @@ fontsize: 12pt
 output:
   pdf_document:
     number_sections: yes
-    toc: yes
+    toc: no
 ---
 
 ```{r setup, include = FALSE}
@@ -87,6 +87,7 @@ packages = c(# Programación literaria; R Markdowns
              "wordcloud",
              "reshape2",
              "quanteda",
+             # Redes de co-ocurrencia
              "igraph",
              "lexicon")
 
@@ -321,22 +322,17 @@ o bueno (según a quien le interese) del humo en los pulmones de los habitantes.
 ### Sentimiento
 #### Palabras negativas y positivas que más aparecen
 El análisis de sentimiento que llevaremos a cabo será el más sencillo posible. La librería
-`tidytext` proporciona un diccionario con información acerca de si una palabras es negativa o
+`tidytext` proporciona un diccionario con información acerca de si una palabra es negativa o
 positiva. Solamente esa información, dos categorías. Obviamente no podemos decir de todas las
 palabras si tienen una connotación positiva o negativa, no todas las palabras del texto aparecerán
-en el diccionario. Para contruir una estructura de datos con las palabras del libro positivas y
-negativas recurrimos otra vez a la librería `dplyr`, a la función `semi_join` concretamente.
+en el diccionario. Para construir una estructura de datos con las palabras del libro positivas y
+negativas recurrimos otra vez a la librería `dplyr`, a la función `semi_join()` concretamente.
 
-Primero, seleccionamos el diccionario,
+Veamos las 25 palabras positivas y negativas que más aparecen en el libro.
 
 ```{r}
 # Seleccionamos el diccionario de palabras a usar
 sentiments <- get_sentiments("bing")
-```
-
-y ahora veamos las 25 palabras positivas y negativas que más aparecen en el libro.
-
-```{r}
 positive <- filter(.data = sentiments, sentiment == "positive")
 WORDSpositive <- semi_join(x = WORDS, y = positive)
 head(WORDSpositive, 25)
@@ -383,7 +379,7 @@ HardTimesWords %>%
   count(word, sentiment, sort = TRUE) %>%
   acast(word ~ sentiment, value.var = "n", fill = 0) %>%
   comparison.cloud(colors = c("#F8766D", "#00BFC4"),
-                   max.words = 100, scale = c(3,.5))
+                   max.words = 100, scale = c(3, 0.5))
 ```
 
 A simple vista, vemos que dominan las palabras positivas, y cuales son las más frecuentes. Pero si
@@ -391,7 +387,7 @@ tratamos por ejemplo de ver cuáles son las palabras negativas que más aparecen
 dificultades. Aquí vemos claramente porqué el histograma es una representación mucho más completa,
 útil, y fácilmente interpretable.
 
-### Evolución sentimiento
+### Evolución del sentimiento
 #### Por libros
 Tal y como hemos definido el sentimiento (frecuencia de aparición de las palabras, negativo si la
 palabra es negativa) podemos calcularlo a intervalos a lo largo del libro y estudiar su evolución.
@@ -499,13 +495,42 @@ positivas. Habría que buscar el equilibrio para dar con un intervalo que reprod
 la connotación del texto a partir de un análisis por palabras individuales únicamente.
 
 ## Redes de co-ocurrencia
+Las redes de co-ocurrencia nos cuentan de forma visual las relaciones de una palabra con las demás a
+lo largo de un texto. Son representaciones de las palabras con un tamaño mayor cuántas más veces
+aparezcan, pero a diferencia de las nubes de palabras, la disposición de las palabras aquí no es
+arbitraria. En la representación aparecen interconectadas por líneas las palabras. De esta forma un
+mapa de co-ocurrencia nos dice las relaciones existentes en un texto entre una palabras y las demás,
+pero también cómo las demás se relacionan entre ellas. Tal y como comentamos en la introducción, en
+el análisis de un libro lo más interesante que se nos ocurre de primeras es contruir este tipo de
+redes para los personajes principales. Esto es justo lo que vamos a hacer.
+
+En la elaboración de las representaciones que hemos visto hasta el momento la tarea más larga ha
+sido el preprocesamiento de los datos, su adecuación para cada representración. Pero una vez tenemos
+preparada la información necesaria, los diversos paquetes que hemos introducido han realizado
+practicamente todo el trabajo. Aunque también es cierto que representar en un histograma las
+palabras más frecuentes, o analizar su sentimiento según diccionarios ya hechos, no es algo quea
+priori parezca complicado. En este caso tendremos que trabajar mucho más. La búsqueda de las
+relaciones entre una palabra y las demás involucra el cálculo de matrices de covarianza y otras
+cosas más que iremos explicando.
+
+Aun así, ahora también recurrimos a otra librería que nos ayudará considerablemente, `quanteda`.
+Este paquete incluye un tipo especial de objeto `corpus`, con un texto, y campos informativos
+adicionales sobre variables tipo documento que no utilizaremos para nada en este trabajo. También
+emplearemos la librería `lexicon`, con diccionarios que necesitaremos para contar como únicas
+ciertas palabras y abreviaturas y para eliminar las palabras vacías.
+
+Comencemos. Lo primero es dividir el texto original en oraciones. Para ello tenemos que juntar antes
+todas las líneas del mismo, ya que hasta la función empleada para descargar el libro lo almacenaba
+línea a línea. 
 
 ```{r}
+# Creamos una variable corpus con todo el texto del libro junto
 HardTimesCorpus <- corpus(paste0(list(HardTimesLines$text)))
+# Lo dividimos en oraciones,
 corpus_sentences <- corpus_reshape(x = HardTimesCorpus, to = "sentences")
 # Diccionario de lemas
 data(hash_lemmas)
-# Palabras de parada
+# Diccionario de palabras vacías
 data(sw_jockers)
 
 # Preprocesado del corpus de palabras
@@ -516,60 +541,51 @@ corpus_tokens <- corpus_sentences %>%
   tokens_remove(pattern = sw_jockers, padding = T)
 ```
 
+Estamos interesados en las palabras que aparecen en cada oración, pero no en si aparecen más de una
+vez en una oración. Es decir, buscamos ver con qué palabras se relaciona cada palabra. Esta
+información la podemos codificar en forma de ceros (la palabra no aparece) y unos (la palabra sí
+aparece). Además, solo tendremos en cuenta las palabras que aparecen en más de 10 oraciones.
+
 ```{r}
 minimumFrequency <- 10
-
 # Creación del DTM, recortado del vocabulario y fijado de valores binarios para la
 # presencia o absencia de tipos
 binDTM <- corpus_tokens %>% 
   tokens_remove("") %>%
   dfm() %>% 
-  dfm_trim(min_docfreq = minimumFrequency, max_docfreq = 10000000) %>% 
+  dfm_trim(min_docfreq = minimumFrequency) %>% 
   dfm_weight("boolean")
 ```
+
+Para calcular la ocurrencia conjunta de palabras solo tenemos que multiplicar la matriz anterior
+traspuesta por ella misma. Notemos que el resultado no será una medida exacta de las frecuencias
+(veces que aparece una palabra por oración), será una especie de distancia (frecuencias al
+cuadrado). Es fácil entender la matriz si reducimos su dimensión al máximo posible, una matriz
+cuadrada 2x2 que repsente dos oraciones y dos palabras. En la diagonal tendremos los términos
+correspondientes a cada palabra en el conjunto de las dos oraciones. Fuera de la diagonal tendremos
+información sobre si las palabras aparecen juntas o no en las oraciones. Es una matriz simétrica.
+Veamos una porción de ella.
 
 ```{r}
 # Multiplicación de matrices para contaje de co-ocurrencias
 coocCounts <- t(binDTM) %*% binDTM
+as.matrix(coocCounts[202:205, 202:205])
 ```
 
-```{r}
-coocTerm <- "bounderby"
-k <- nrow(binDTM)
-ki <- sum(binDTM[, coocTerm])
-kj <- colSums(binDTM)
-names(kj) <- colnames(binDTM)
-kij <- coocCounts[coocTerm, ]
-```
+Como hemos codificado la aparición de una palabra en la matriz inicial como 1, la diagonal sí es
+exactamente el número de oraciones en las que aparece cada palabra. Y como hemos codificado con un 0
+el que una palabra no aparezca, cada elemento de fuera de la diagonal es el número de oraciones en
+las que aparecen juntas las dos palabras correspondientes.
 
-```{r}
-# MI: log(k*kij / (ki * kj)
-mutualInformationSig <- log(k * kij / (ki * kj))
-mutualInformationSig <- mutualInformationSig[order(mutualInformationSig, decreasing = TRUE)]
+Hasta aquí podemos entender el proceso, lo que sigue se escapa demasiado de los objetivos del
+trabajo, así que solo esplicaremos qué queremos hacer y no cómo. Hemos visto cómo calcular la
+ocurrencia conjunta de las palabras en grupos, pero para establecer relaciones más o menos fuertes
+entre las mismas hace falta estudiar la significación de la co-ocurencia. En la referencia [3]
+encontramos más información al respecto.
 
-# DICE: 2 X&Y / X + Y
-dicesig <- 2 * kij / (ki + kj)
-dicesig <- dicesig[order(dicesig, decreasing=TRUE)]
-
-# Log Likelihood
-logsig <- 2 * ((k * log(k)) - (ki * log(ki)) - (kj * log(kj)) + (kij * log(kij)) 
-               + (k - ki - kj + kij) * log(k - ki - kj + kij) 
-               + (ki - kij) * log(ki - kij) + (kj - kij) * log(kj - kij) 
-               - (k - ki) * log(k - ki) - (k - kj) * log(k - kj))
-logsig <- logsig[order(logsig, decreasing=T)]
-```
-
-```{r}
-# Ponemos todos los estadísticos de significancia en un solo data frame
-resultOverView <- data.frame(
-  names(sort(kij, decreasing = T)[1:10]), sort(kij, decreasing = T)[1:10],
-  names(mutualInformationSig[1:10]), mutualInformationSig[1:10], 
-  names(dicesig[1:10]), dicesig[1:10], 
-  names(logsig[1:10]), logsig[1:10],
-  row.names = NULL)
-colnames(resultOverView) <- c("Freq-terms", "Freq", "MI-terms", "MI", "Dice-Terms", "Dice", "LL-Terms", "LL")
-print(resultOverView)
-```
+Construyamos el mapa de co-ocurrencia del señor Bounderby y de la señora Sparsit, una viuda que un
+día fue una dama de alta alcurnia y que ahora ha acabado sirviendo al realista, tozudo y orgulloso
+señor Bounderby.
 
 ```{r}
 # Leemos el siguiente código fuente para realizar el cálculo de la co-ocurrencia
@@ -880,7 +896,7 @@ GreatExpectationsWords %>%
 
 Se puede ver, de nuevo, que hay un ligero desbarajuste entre palabras negativas y positivas.
 
-### Evolución sentimiento
+### Evolución del sentimiento
 De nuevo, calcularemos la evolución de la frecuencia de los dos sentimientos a lo largo
 de dos divisiones del texto; según capítulos y cada 100 palabras.
 
@@ -902,11 +918,8 @@ ChaptersSentiment <- bind_rows(ChaptersSentiment)
 ggplot(ChaptersSentiment, aes(x = chapter, y = sentiment, col = book)) + geom_bar(stat = "identity", show.legend = FALSE) + facet_wrap( ~ book, ncol = 1, scales = "free_x")
 ```
 
-Tal y como cabría esperar, cuanto más pequeño sea el intervalo a lo largo del cual calculamos el
-sentimiento, más variará el mismo. Para ver si ahora se corresponden mejor los resultados con la
-historia contada en el libro haría falta profundizar mucho más en la historia, no llegaremos a hasta
-este nivel de detalle. Como tendencia más o mejor general podemos decir que el sentimiento va
-oscilando a lo largo de la novela.
+Como antes, cuanto más pequeño sea el intervalo a lo largo del cual calculamos el
+sentimiento, más variará el mismo.
 
 #### Por cada 100 palabras
 También podemos ver la evolución del sentimiento a lo largo del texto por intervalos más regulares.
@@ -957,57 +970,19 @@ corpus_tokens <- corpus_sentences %>%
 
 ```{r}
 minimumFrequency <- 10
-
 # Creación del DTM, recortado del vocabulario y fijado de valores binarios para la
 # presencia o absencia de tipos
 binDTM <- corpus_tokens %>% 
   tokens_remove("") %>%
   dfm() %>% 
-  dfm_trim(min_docfreq = minimumFrequency, max_docfreq = 10000000) %>% 
+  dfm_trim(min_docfreq = minimumFrequency) %>% 
   dfm_weight("boolean")
 ```
 
 ```{r}
 # Multiplicación de matrices para contaje de co-ocurrencias
 coocCounts <- t(binDTM) %*% binDTM
-```
-
-```{r}
-coocTerm <- "bounderby"
-k <- nrow(binDTM)
-ki <- sum(binDTM[, coocTerm])
-kj <- colSums(binDTM)
-names(kj) <- colnames(binDTM)
-kij <- coocCounts[coocTerm, ]
-```
-
-```{r}
-# MI: log(k*kij / (ki * kj)
-mutualInformationSig <- log(k * kij / (ki * kj))
-mutualInformationSig <- mutualInformationSig[order(mutualInformationSig, decreasing = TRUE)]
-
-# DICE: 2 X&Y / X + Y
-dicesig <- 2 * kij / (ki + kj)
-dicesig <- dicesig[order(dicesig, decreasing=TRUE)]
-
-# Log Likelihood
-logsig <- 2 * ((k * log(k)) - (ki * log(ki)) - (kj * log(kj)) + (kij * log(kij)) 
-               + (k - ki - kj + kij) * log(k - ki - kj + kij) 
-               + (ki - kij) * log(ki - kij) + (kj - kij) * log(kj - kij) 
-               - (k - ki) * log(k - ki) - (k - kj) * log(k - kj))
-logsig <- logsig[order(logsig, decreasing=T)]
-```
-
-```{r}
-# Ponemos todos los estadísticos de significancia en un solo data frame
-resultOverView <- data.frame(
-  names(sort(kij, decreasing = T)[1:10]), sort(kij, decreasing = T)[1:10],
-  names(mutualInformationSig[1:10]), mutualInformationSig[1:10], 
-  names(dicesig[1:10]), dicesig[1:10], 
-  names(logsig[1:10]), logsig[1:10],
-  row.names = NULL)
-colnames(resultOverView) <- c("Freq-terms", "Freq", "MI-terms", "MI", "Dice-Terms", "Dice", "LL-Terms", "LL")
-print(resultOverView)
+as.matrix(coocCounts[1:3, 1:3])
 ```
 
 ```{r}
@@ -1114,6 +1089,18 @@ plot(graphNetwork,
      # Tamaño de la fuente de los nombres de los nodos
      vertex.label.cex = 1)
 ```
+
+# Conclusiones
+Si bien es cierto que todo el análisis llevado a cabo ha sido realmente interesante e instructivo,
+más cuando uno se ha leido el libro, uno podría dudar sobre la utilidad práctica de estas técticas
+de procesado y visualización. En nuestra opinión, no cabe la menor duda al respecto, aplicar estas
+técnicas a libros es un ejercicio para pasar el rato, pero pueden aplicarse a cualquier tipo de
+texto. Si uno tuviera por ejemplo un canal de youtube con muchos comentarios, y estuviera interesado
+en analizarlos, podría aplicar estas técnicas. Y quien dice un canal de youtube, dice también una
+tienda de ropa, de informática, una página web, una aplicación... Podríamos aplicar estas técnicas
+en definitiva para el análisis de opiniones de cualquier producto o servicio. Cuando tenemos muchas
+estas nos podrían ayudar a tener una visión general de la opinión de la gente sin tener que leerlas
+todas. Hemos elegido analizar libros porque como ejercicio lo hemos considerado más entretenido.
 
 # Bibliografía
 [1] https://cran.r-project.org/web/packages/tidytext/vignettes/tidytext.html
