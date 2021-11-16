@@ -786,7 +786,7 @@ n <- 0
 for (i in 1:nrow(GreatExpectationsLines)) {
   # En cada elemento de GEWordsRaw, partimos las líneas de acuerdo con estos
   # caracteres especificados en "split",
-  GEWordsRaw[[i]] <- strsplit(x = GreatExpectationsLines$text[i], split = "[ .,;—)(?!‘:]")
+  GEWordsRaw[[i]] <- strsplit(x = GreatExpectationsLines$text[i], split = "[ .,;”—)(?!‘:]")
   # Y en GEWords almacenamos GEWordsRaw sin los elementos que no contengan palabras,
   GEWords[[i]] <- GEWordsRaw[[i]][[1]][!GEWordsRaw[[i]][[1]] == ""]
   if (length(GEWords[[i]]) == 0) {
@@ -813,6 +813,9 @@ gráficamente.
 ```{r}
 GEWords <- count(GreatExpectationsWords, word, sort = TRUE) %>%
   anti_join(get_stopwords())
+# Quitamos una cierta palabra, dado que no parece tener sentido...
+str(GEWords)
+subset(GEWords, GEWords$word != "“i")
 head(GEWords, 25)
 ```
 
@@ -825,7 +828,7 @@ GEWords %>% filter(n > 180) %>% mutate(word = reorder(word, n)) %>%
 GreatExpectationsWords %>%
   anti_join(stop_words) %>%
   count(word) %>%
-  {wordcloud(.$word, .$n, max.words = 100, scale = c(3,.5))}
+  {wordcloud(.$word, .$n, max.words = 100, scale = c(3, 0.5))}
 ```
 
 De nuevo, representamos gráficamente la frecuencia de aparición de bigramas,
@@ -839,7 +842,7 @@ GreatExpectationsBigrams <- GreatExpectationsLines %>%
   filter(bigram != "NA NA") %>%
   count(bigram, sort = TRUE)
 
-GreatExpectationsBigrams %>% mutate(bigram = reorder(bigram, n)) %>% slice(1:19) %>% ggplot(aes(x = n, y = bigram)) + geom_col() +   labs(title = "book 1")
+GreatExpectationsBigrams %>% mutate(bigram = reorder(bigram, n)) %>% slice(1:19) %>% ggplot(aes(x = n, y = bigram)) + geom_col() + labs(title = "Bigramas más comunes en Grandes Esperanzas")
 ```
 
 ### Sentimiento
@@ -884,7 +887,18 @@ GEWordsSentiment %>% filter(n > 20) %>%
 En contraste a "Tiempos Difíciles", el sentimiento de este libro parece estar equilibrado entre
 positivo y negativo, aunque teniendo en cuenta el lenguaje de la época, como antes, es bastante
 posible que este libro sea incluso más negativo que el anterior, algo plausible dado que esta
-novela tiene tintes autobiográficos.
+novela tiene tintes autobiográficos. Sin embargo, si nos fijamos un poco mejor en la tendencia
+que tienen los bines del histograma para cada sentimiento, vemos que los negativos parecen ser
+más pequeños en general que los positivos, pero están dominados por "miss", que tiene un contaje
+superior a cualquier término aquí visto.
+
+Esto es debido a que está codificado de forma algo errónea; "miss" puede significar "echar de menos"
+pero también significa "señorita"; podemos decir que tenemos ruido en la medida de su frecuencia.
+Para deshacernos del ruido y cuantificar adecuadadmente el sentimiento, haría falta analizar
+el contexto en el que ha sido mencionada esta palabra, cosa que queda fuera de los objetivos
+de este trabajo. Aún así, la visualización del sentimiento nos ha permitido ver una anomalía
+en el procesado del texto, lo cual resulta de suma importancia al hacer análisis más profundos
+para refinar el código y/o las técnicas utilizadas.
 
 Como antes, podemos representar la anterior información mediante una nube de palabras
 de una forma idéntica, aplicando las mismas palabras.
@@ -898,7 +912,8 @@ GreatExpectationsWords %>%
                    max.words = 100, scale = c(3, 0.5))
 ```
 
-Se puede ver, de nuevo, que hay un ligero desbarajuste entre palabras negativas y positivas.
+Se puede ver, de nuevo, que las palabras positivas tienen una mayor frecuencia en general,
+y la forma en que destaca "miss".
 
 ### Evolución del sentimiento
 De nuevo, calcularemos la evolución de la frecuencia de los dos sentimientos a lo largo
@@ -907,19 +922,15 @@ de dos divisiones del texto; según capítulos y cada 100 palabras.
 #### Por capítulos
 
 ```{r}
-ChaptersSentiment <- list(length(BooksStart))
-for (i in 1:length(BooksStart)) {
-  ChaptersSentiment[[i]] <- count(x = GreatExpectationsSentiment[GreatExpectationsSentiment$book == i, ], chapter, sentiment)
-}
+GreatExpectationsSentiment <- inner_join(x = GreatExpectationsWords, y = sentiments)
+ChaptersSentiment <- count(x = GreatExpectationsSentiment, chapter, sentiment)
 
-for (i in 1:length(BooksStart)) {
-  p <- filter(.data = ChaptersSentiment[[i]], sentiment == "negative")
-  n <- filter(.data = ChaptersSentiment[[i]], sentiment == "positive")
-  ChaptersSentiment[[i]] <- data.frame(book = i, chapter = p$chapter, sentiment = (p$n - n$n)/(p$n + n$n))
-}
+p <- filter(.data = ChaptersSentiment, sentiment == "negative")
+n <- filter(.data = ChaptersSentiment, sentiment == "positive")
+ChaptersSentiment <- data.frame(chapter = p$chapter, sentiment = (p$n - n$n)/(p$n + n$n))
 
 ChaptersSentiment <- bind_rows(ChaptersSentiment)
-ggplot(ChaptersSentiment, aes(x = chapter, y = sentiment, col = book)) + geom_bar(stat = "identity", show.legend = FALSE) + facet_wrap( ~ book, ncol = 1, scales = "free_x")
+ggplot(ChaptersSentiment, aes(x = chapter, y = sentiment)) + geom_bar(stat = "identity", show.legend = FALSE)
 ```
 
 Como antes, cuanto más pequeño sea el intervalo a lo largo del cual calculamos el
@@ -995,7 +1006,7 @@ source("calculateCoocStatistics.R")
 # Definimos el parámetro para la representación de las co-ocurrencias de un concepto
 numberOfCoocs <- 15
 # Determination of the term of which co-competitors are to be measured.
-coocTerm <- "bounderby"
+coocTerm <- "pip"
 ```
 
 ```{r}
