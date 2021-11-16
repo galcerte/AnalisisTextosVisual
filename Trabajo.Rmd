@@ -289,6 +289,10 @@ hijos mayores del señor Gradgrind, Louisa y Tom. Su vida (educados con una ideo
 realista y práctica, dejando de lado toda imaginación o fantasía) contrasta con la de la gente de un
 circo que llega a la ciudad.
 
+También vemos los pares "eminently practical" y "practical friend", pares de palabras que utilizan
+mucho el señor Gradgrind y Bounderby para referirse a prácticamente a cualquier persona cercana y a
+su propia amistad.
+
 ```{r}
 HardTimesBooksBigrams %>% filter(book == 2) %>% mutate(bigram = reorder(bigram, n)) %>% slice(1:19) %>% ggplot(aes(x = n, y = bigram)) + geom_col() + labs(title = "Segundo libro")
 ```
@@ -328,8 +332,6 @@ palabras si tienen una connotación positiva o negativa, no todas las palabras d
 en el diccionario. Para construir una estructura de datos con las palabras del libro positivas y
 negativas recurrimos otra vez a la librería `dplyr`, a la función `semi_join()` concretamente.
 
-Veamos las 25 palabras positivas y negativas que más aparecen en el libro.
-
 ```{r}
 # Seleccionamos el diccionario de palabras a usar
 sentiments <- get_sentiments("bing")
@@ -341,13 +343,14 @@ WORDSnegative <- semi_join(x = WORDS, y = negative)
 head(WORDSnegative, 25)
 ```
 
-Para visualizar esta información recurrimos una vez más a un histograma, pero con una diferencia con
-respecto al anterior, ahora tenemos las palabras clasificadas en dos grupos. Como estamos
-interesados en un análisis de sentimiento, escogeremos las palabras que aparezcan más veces que
-cierto umbral, el mismo para las positivas y las negativas. Así podremos ver si hay más palabras de
-un tipo u otro. Para evaluar el sentimiento, consideramos éste simplemente como las veces que
-aparece cada palabra, y si esta palabra es negativa le cambiaremos el signo. A continuación,
-representaremos este histograma.
+Veamos las 25 palabras positivas y negativas que más aparecen en el libro. Para visualizar esta
+información recurrimos una vez más a un histograma, pero con una diferencia con respecto al
+anterior, ahora tenemos las palabras clasificadas en dos grupos. Como estamos interesados en un
+análisis de sentimiento, escogeremos las palabras que aparezcan más veces que cierto umbral, el
+mismo para las positivas y las negativas. Así podremos ver si hay más palabras de un tipo u otro.
+Para evaluar el sentimiento, consideramos éste simplemente como las veces que aparece cada palabra,
+y si esta palabra es negativa le cambiaremos el signo. A continuación, representaremos este
+histograma.
 
 ```{r}
 WORDSsentiment <- full_join(x = WORDS, y = sentiments)
@@ -389,10 +392,10 @@ dificultades. Aquí vemos claramente porqué el histograma es una representació
 
 ### Evolución del sentimiento
 #### Por libros
-Tal y como hemos definido el sentimiento (frecuencia de aparición de las palabras, negativo si la
-palabra es negativa) podemos calcularlo a intervalos a lo largo del libro y estudiar su evolución.
-Este es un ejercicio muy recurrente en las fuentes bibliográficas [1] y [2]. Para empezar, veamos el
-sentimiento de cada parte del libro con un histograma.
+Tal y como hemos definido el sentimiento (diferencia del contaje de las palabras negativas y
+positivas normalizado a la suma de estas dos) podemos calcularlo a intervalos a lo largo del libro y
+estudiar su evolución. Este es un ejercicio muy recurrente en las fuentes bibliográficas [1] y [2].
+Para empezar, veamos el sentimiento de cada parte del libro con un histograma.
 
 ```{r}
 HardTimesSentiment <- inner_join(x = HardTimesWords, y = sentiments)
@@ -412,10 +415,10 @@ de las partes del libro tuviera una tendencia negativa, ya que poco a poco nos v
 triste final, y las tragedias y consecuencias negativas de todo lo anterior van apareciendo. Aunque
 sí es cierto que no todo hacia el final es malo, vemos que algunos personajes se dan cuenta de sus
 errores (aunque ya sea tarde) e intentan cambiar, sí es cierto que no sabemos interpretar el
-histograma anterior. Esto es debido a la capacidad limitada de estas técticas de análisis,
+histograma anterior. Esto es debido a la capacidad limitada de estas técnicas de análisis,
 recordemos que solo hemos visto si las palabras individualmente tienen una connotación positiva o
-negativa. Esto no es suficiente para un libro de literatura con un lenguaje complejo, harían falta
-técticas más complicadas que están fuera del alcance y los objetivos de este trabajo.
+negativa. Esto no es suficiente para un obra literaria con un lenguaje complejo, harían falta
+técnicas más complicadas que están fuera del alcance y los objetivos de este trabajo.
 
 #### Por capítulos
 Veamos ahora la evolución del sentimiento a lo largo de los capítulos.
@@ -439,8 +442,8 @@ ggplot(ChaptersSentiment, aes(x = chapter, y = sentiment, col = book)) + geom_ba
 
 Tal y como cabría esperar, cuanto más pequeño sea el intervalo a lo largo del cual calculamos el
 sentimiento, más variará el mismo. Para ver si ahora se corresponden mejor los resultados con la
-historia contada en el libro haría falta profundizar mucho más en la historia, no llegaremos a hasta
-este nivel de detalle. Como tendencia más o menos general podemos decir que el sentimiento va
+historia contada en el libro haría falta profundizar mucho más en la historia, así que no llegaremos
+a este nivel de detalle. Como tendencia más o menos general podemos decir que el sentimiento va
 oscilando a lo largo de la novela.
 
 Fijémonos en los últimos capítulos. Al final del libro, como ya hemos comentado, se rompen las vidas
@@ -482,7 +485,7 @@ ggplot(Group10LinesSentiment, aes(x = Group100Words, y = sentiment)) + geom_bar(
 
 Podría sorprendernos la cantidad escasa de puntos del histograma, pero recordemos, no todas las
 palabras tienen connotación positiva o negativa, estamos viendo un subconjunto de las palabras del
-libro. Tal y cómo pasaba en la evolución por capítulos la tendencia general en el sentimiento son
+libro. Tal y cómo pasaba en la evolución por capítulos, la tendencia general en el sentimiento son
 oscilaciones de amplitud variable. Como ahora hemos tomado más intervalos, las variaciones son más
 abruptas. En estos picos significativos predominan las palabras positivas o negativas, sí, pero para
 ver si realmente esto se corresponde con el significado del texto tendríamos que volver a leer estas
@@ -505,17 +508,17 @@ el análisis de un libro lo más interesante que se nos ocurre de primeras es co
 redes para los personajes principales. Esto es justo lo que vamos a hacer.
 
 En la elaboración de las representaciones que hemos visto hasta el momento la tarea más larga ha
-sido el preprocesamiento de los datos, su adecuación para cada representración. Pero una vez tenemos
-preparada la información necesaria, los diversos paquetes que hemos introducido han realizado
-practicamente todo el trabajo. Aunque también es cierto que representar en un histograma las
-palabras más frecuentes, o analizar su sentimiento según diccionarios ya hechos, no es algo quea
+sido el preprocesamiento de los datos, adecuándolos para cada representación gráfica. Pero una vez
+tenemos preparada la información necesaria, los diversos paquetes que hemos introducido han
+realizado prácticamente todo el trabajo. Aunque también es cierto que representar en un histograma
+las palabras más frecuentes, o analizar su sentimiento según diccionarios ya hechos, no es algo que a
 priori parezca complicado. En este caso tendremos que trabajar mucho más. La búsqueda de las
 relaciones entre una palabra y las demás involucra el cálculo de matrices de covarianza y otras
 cosas más que iremos explicando.
 
 Aun así, ahora también recurrimos a otra librería que nos ayudará considerablemente, `quanteda`.
 Este paquete incluye un tipo especial de objeto `corpus`, con un texto, y campos informativos
-adicionales sobre variables tipo documento que no utilizaremos para nada en este trabajo. También
+adicionales sobre variables tipo documento de los que no haremos uso en este trabajo. También
 emplearemos la librería `lexicon`, con diccionarios que necesitaremos para contar como únicas
 ciertas palabras y abreviaturas y para eliminar las palabras vacías.
 
@@ -561,10 +564,9 @@ Para calcular la ocurrencia conjunta de palabras solo tenemos que multiplicar la
 traspuesta por ella misma. Notemos que el resultado no será una medida exacta de las frecuencias
 (veces que aparece una palabra por oración), será una especie de distancia (frecuencias al
 cuadrado). Es fácil entender la matriz si reducimos su dimensión al máximo posible, una matriz
-cuadrada 2x2 que repsente dos oraciones y dos palabras. En la diagonal tendremos los términos
+cuadrada 2x2 que represente dos oraciones y dos palabras. En la diagonal tendremos los términos
 correspondientes a cada palabra en el conjunto de las dos oraciones. Fuera de la diagonal tendremos
 información sobre si las palabras aparecen juntas o no en las oraciones. Es una matriz simétrica.
-Veamos una porción de ella.
 
 ```{r}
 # Multiplicación de matrices para contaje de co-ocurrencias
@@ -577,11 +579,11 @@ exactamente el número de oraciones en las que aparece cada palabra. Y como hemo
 el que una palabra no aparezca, cada elemento de fuera de la diagonal es el número de oraciones en
 las que aparecen juntas las dos palabras correspondientes.
 
-Hasta aquí podemos entender el proceso, lo que sigue se escapa demasiado de los objetivos del
-trabajo, así que solo esplicaremos qué queremos hacer y no cómo. Hemos visto cómo calcular la
-ocurrencia conjunta de las palabras en grupos, pero para establecer relaciones más o menos fuertes
-entre las mismas hace falta estudiar la significación de la co-ocurencia. En la referencia [3]
-encontramos más información al respecto.
+Hasta aquí podemos entender el proceso, lo que sigue se escapa de los objetivos del trabajo, así que
+solo esplicaremos qué queremos hacer y no cómo. Hemos visto cómo calcular la ocurrencia conjunta de
+las palabras en grupos, pero para establecer relaciones más o menos fuertes entre las mismas hace
+falta estudiar la significación de la co-ocurencia. En la referencia [3] encontramos más información
+al respecto.
 
 Construyamos el mapa de co-ocurrencia del señor Bounderby y de la señora Sparsit, una viuda que un
 día fue una dama de alta alcurnia y que ahora ha acabado sirviendo al realista, tozudo y orgulloso
@@ -702,10 +704,11 @@ cuando el protagonista tiene solo siete años de edad, hasta el invierno de 1840
 
 ## Organización de los datos
 ### Clasificación de las líneas por capítulos
-Veamos qué nos depara este libro. Está dividido en 59 capítulos, sin estar dividido por libros.
-Lo trataremos como un solo libro. La obra en sí comienza más abajo de lo que descargamos de
-Gutenberg, dado que se incluye una lista de capítulos aquí, así que hemos de quitar estas líneas
-para poder clasificar las líneas por capítulos adecuadamente.
+Veamos qué nos depara este libro. Está dividido en 59 capítulos, sin estar dividido por libros. Lo
+trataremos como un solo libro, aunque sí respetaremos su división por capítulos. La obra en sí
+comienza más abajo de lo que descargamos de Gutenberg, dado que se incluye una lista de capítulos
+aquí, así que hemos de quitar estas líneas para poder clasificar las líneas por capítulos
+adecuadamente.
 
 ```{r}
 # Descargamos Great Expectations de la biblioteca Gutenberg,
@@ -765,7 +768,8 @@ save(GreatExpectationsLines, file = "data/GreatExpectationsLines.Rdata")
 
 ### División por palabras
 De nuevo, dividimos el libro en palabras, o lo que es lo mismo, "tokenizar" las líneas
-leídas según los espacios (" ") que se encuentren.
+leídas según los espacios (" ") que se encuentren. En cada fila, guardamos una palabra,
+junto con información sobre el capítulo donde se encuentran, como antes.
 
 ```{r}
 GEWordsRaw <- vector("list", length = nrow(GreatExpectationsLines))
@@ -803,15 +807,14 @@ save(GreatExpectationsWords, file = "data/GreatExpectationsWords.Rdata")
 
 ## Visualización de características
 ### Palabras más frecuentes
-Veamos las 25 palabras más frecuentes en "Grandes Esperanzas".
+Veamos las 25 palabras más frecuentes en "Grandes Esperanzas", para luego representar esto
+gráficamente.
 
 ```{r}
 GEWords <- count(GreatExpectationsWords, word, sort = TRUE) %>%
   anti_join(get_stopwords())
 head(GEWords, 25)
 ```
-
-y ahora representamos gráficamente 
 
 ```{r}
 GEWords %>% filter(n > 180) %>% mutate(word = reorder(word, n)) %>%
@@ -860,8 +863,8 @@ head(GEWordsNegative, 25)
 Como antes, primero visualizamos el contaje de la ocurrencia de cada palabra mediante un histograma
 dispuesto verticalmente, con columnas apuntando en direcciones opuestas y con colores escogidos
 adecuadamente de forma que no sólo enseñen a primera vista que tipo de dato categórico representan,
-sino que tenemos el valor añadido de que el azul y el naranja son colores contrarios en la rueda de
-los colores, facilitando así aún más la legibilidad de esta gráfica.
+sino que tenemos el valor añadido de que el azul y el naranja son colores contrarios en el círculo
+cromático, facilitando así aún más la legibilidad de esta gráfica.
 
 ```{r}
 GEWordsSentiment <- full_join(x = GEWords, y = sentiments)
@@ -880,7 +883,8 @@ GEWordsSentiment %>% filter(n > 20) %>%
 
 En contraste a "Tiempos Difíciles", el sentimiento de este libro parece estar equilibrado entre
 positivo y negativo, aunque teniendo en cuenta el lenguaje de la época, como antes, es bastante
-posible que este libro sea incluso más negativo que el anterior.
+posible que este libro sea incluso más negativo que el anterior, algo plausible dado que esta
+novela tiene tintes autobiográficos.
 
 Como antes, podemos representar la anterior información mediante una nube de palabras
 de una forma idéntica, aplicando las mismas palabras.
@@ -1092,15 +1096,16 @@ plot(graphNetwork,
 
 # Conclusiones
 Si bien es cierto que todo el análisis llevado a cabo ha sido realmente interesante e instructivo,
-más cuando uno se ha leido el libro, uno podría dudar sobre la utilidad práctica de estas técticas
+más cuando uno se ha leído el libro, uno podría dudar sobre la utilidad práctica de estas técticas
 de procesado y visualización. En nuestra opinión, no cabe la menor duda al respecto, aplicar estas
 técnicas a libros es un ejercicio para pasar el rato, pero pueden aplicarse a cualquier tipo de
-texto. Si uno tuviera por ejemplo un canal de youtube con muchos comentarios, y estuviera interesado
-en analizarlos, podría aplicar estas técnicas. Y quien dice un canal de youtube, dice también una
-tienda de ropa, de informática, una página web, una aplicación... Podríamos aplicar estas técnicas
-en definitiva para el análisis de opiniones de cualquier producto o servicio. Cuando tenemos muchas
-estas nos podrían ayudar a tener una visión general de la opinión de la gente sin tener que leerlas
-todas. Hemos elegido analizar libros porque como ejercicio lo hemos considerado más entretenido.
+texto. Si uno tuviera por ejemplo un canal de YouTube con muchos comentarios, y estuviera interesado
+en analizarlos, podría aplicar estas técnicas. Y quien dice un canal de YouTube, dice también una
+tienda de ropa, de informática, una página web, una aplicación... En definitiva, podríamos aplicar
+estas técnicas para el análisis de opiniones de cualquier producto o servicio. Al tener muchas,
+éstas nos podrían ayudar a tener una visión general de la opinión de la gente de una forma
+automática. Hemos elegido analizar libros porque como ejercicio lo hemos considerado más
+entretenido.
 
 # Bibliografía
 [1] https://cran.r-project.org/web/packages/tidytext/vignettes/tidytext.html
